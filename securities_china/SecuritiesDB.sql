@@ -77,7 +77,7 @@ create table if not exists `securities_transaction` (
        `time` date not null, -- 成交日期
        `code` varchar(6), -- 证券代码
        `price` decimal(10,4), -- 成交价格（元）
-       `vol` int, -- 成交量(股)
+       `vol` decimal(20,2), -- 成交量(股)
        `tname` varchar(10), -- 业务名称
        `amount` decimal(20,4), -- 发生金额（元）
        `balance` decimal(20,4) -- 剩余金额（元）
