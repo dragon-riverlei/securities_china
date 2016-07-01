@@ -138,7 +138,7 @@ from securities_day_quote q
 join dividend_2010_5 d on d.code = q.code
 join securities_dividend_plan dp on d.code = dp.code
 join securities_major_financial_kpi kpi on d.code = kpi.code
-where q.per > 1 and q.per < 20 and q.time='2016-05-31' and kpi.MFRation22 > 10 and kpi.time = '2015-12-31'
+where q.per > 1 and q.per < 20 and q.time='2016-07-01' and kpi.MFRation22 > 10 and kpi.time = '2015-12-31'
 order by 分红比价格 desc
 limit 30;
 

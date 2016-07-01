@@ -2,6 +2,10 @@
 #
 # 上海，深圳证券主要财务指标
 # http://stock.finance.qq.com/corp1/mfratio.php?zqdm=${code}
+#
+# Example usage:
+# scrapy crawl SecuritiesMajorFinancialKPI -a dates=2016-03-31
+
 
 from __future__ import print_function
 import scrapy

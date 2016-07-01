@@ -35,7 +35,9 @@ class SecuritiesDividendPlan(scrapy.Spider):
         else:
             self.start_urls = [
                 self.url_tpl + code[0]
-                for code in self.db.query_securities_code().fetch_row(0)
+                for code in
+                self.db.query_securities_code_without_dividend_plan(self.years)
+                .fetch_row(maxrows=0)
             ]
 
     def parse(self, response):

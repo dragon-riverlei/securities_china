@@ -5,6 +5,8 @@ import ConfigParser
 
 import MySQLdb
 
+import subprocess
+
 
 class SecuritiesDB():
     db = None
@@ -36,6 +38,17 @@ class SecuritiesDB():
         self.db.query("select code,market from dividend_2010_5")
         return self.db.store_result()
 
+    def query_securities_code_without_dividend_plan(self, years):
+        if(years is not None):
+            sql = " union ".join(
+                ["select code from securities_code where code not in "
+                 "(select code from securities_dividend_plan where year=%s)" %
+                 year for year in years])
+        else:
+            sql = "select code from securities_code"
+        self.db.query(sql)
+        return self.db.store_result()
+
     def query_short_list_01(self):
         self.db.query("select code from short_list_01")
         return self.db.store_result()
@@ -56,8 +69,8 @@ class SecuritiesDB():
                 "insert into securities_dividend "
                 "values (%s, %s, %s, %s, %s, %s, %s, %s) "
                 "on duplicate key update code=%s, year=%s",
-                (div[0], div[1], div[2], div[3], div[4], div[5], div[6],
-                 div[7], div[0], div[1]))
+                (div[0], div[1], div[2], div[3], div[4], div[5],
+                 div[6], div[7], div[0], div[1]))
         self.db.commit()
 
     def insert_securities_dividend_plan(self, dividends):
@@ -67,8 +80,8 @@ class SecuritiesDB():
                 "insert into securities_dividend_plan "
                 "values (%s, %s, %s, %s, %s, %s) "
                 "on duplicate key update code=%s, year=%s",
-                (div[0], div[1], div[2], div[3], div[4], div[5], div[0],
-                 div[1]))
+                (div[0], div[1], div[2], div[3], div[4], div[5],
+                 div[0], div[1]))
         self.db.commit()
 
     def insert_securities_day_quote(self, quote):
@@ -90,8 +103,7 @@ class SecuritiesDB():
             "insert into securities_major_financial_kpi "
             "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, "
             "%s, %s, %s, %s, %s, %s, %s, %s, %s) "
-            "on duplicate key update code=%s",
-            tuple(kpi))
+            "on duplicate key update code=%s", tuple(kpi))
         self.db.commit()
 
     def insert_securities_stock_structure(self, struc):
@@ -100,21 +112,43 @@ class SecuritiesDB():
         cur.execute(
             "insert into securities_stock_structure "
             "values (%s, %s, %s, %s, %s, %s, %s) "
-            "on duplicate key update code=%s, time=%s",
-            tuple(struc))
+            "on duplicate key update code=%s, time=%s", tuple(struc))
         self.db.commit()
 
-    def insert_securities_transaction(self, transactions):
+    def insert_securities_transaction1(self):
+        cmd = subprocess.Popen('./SecuritiesTransactions1.sh',
+                               stdout=subprocess.PIPE)
+        out, err = cmd.communicate()
+        transactions = out.split('\n')
         cur = self.db.cursor()
         for tran in transactions:
-            t = tran.split()
-            cur.execute(
-                "insert into securities_transaction "
-                "(time, code, price, vol, tname, amount, balance) "
-                "values (%s, %s, %s, %s, %s, %s, %s)",
-                (t[0], t[1], t[2], t[3], t[4], t[5], t[6]))
+            if (len(tran.split()) == 7):
+                t = tran.split()
+                cur.execute(
+                    "insert into securities_transaction "
+                    "(time, code, price, vol, tname, amount, balance) "
+                    "values (%s, %s, %s, %s, %s, %s, %s)",
+                    (t[0], t[1], t[2], t[3], t[4], t[5], t[6]))
+        self.db.commit()
+
+    def insert_securities_transaction2(self):
+        cmd = subprocess.Popen('./SecuritiesTransactions2.sh',
+                               stdout=subprocess.PIPE)
+        out, err = cmd.communicate()
+        transactions = out.split('\n')
+        cur = self.db.cursor()
+        for tran in transactions:
+            if (len(tran.split()) == 4):
+                t = tran.split()
+                cur.execute(
+                    "insert into securities_transaction "
+                    "(time, code, price, vol, tname, amount, balance) "
+                    "values (%s, %s, %s, %s, %s, %s, %s)",
+                    (t[0], "", 0.0, 0.0, t[1], t[2], t[3]))
         self.db.commit()
 
 
 if __name__ == "__main__":
     sdb = SecuritiesDB()
+    sdb.insert_securities_transaction1()
+    sdb.insert_securities_transaction2()
