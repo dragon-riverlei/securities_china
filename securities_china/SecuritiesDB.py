@@ -7,9 +7,13 @@ import MySQLdb
 
 import subprocess
 
+import re
+
 
 class SecuritiesDB():
     db = None
+    tdx_home = "/cygdrive/d/东莞证券/"
+    date_rexp = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})")
 
     def __init__(self):
         cfg = ConfigParser.ConfigParser()
@@ -53,6 +57,18 @@ class SecuritiesDB():
         self.db.query("select code from short_list_01")
         return self.db.store_result()
 
+    def query_invst_profit(self, start, end):
+        pass
+
+    def query_portfolio_value(time):
+        pass
+
+    def query_cash_deposit(time):
+        pass
+
+    def query_net_cashflow(time):
+        pass
+
     def insert_securities_code(self, codes):
         cur = self.db.cursor()
         for code in codes:
@@ -95,6 +111,44 @@ class SecuritiesDB():
              quote[6], quote[0], quote[1], quote[2], quote[3], quote[4],
              quote[5], quote[6]))
         self.db.commit()
+
+    def insert_securities_day_quote_history(self, date, code):
+        cmd = subprocess.Popen(['./TdxDayQuoteFile.sh', code],
+                               stdout=subprocess.PIPE)
+        out, err = cmd.communicate()
+        day_quote_file = out.split('\n')[0]
+        close_price = self.parse_tdx_day_quote_file(day_quote_file, date)
+        # cur = self.db.cursor()
+        # cur.execute(
+        #     "insert into securities_day_quote_hisotry"
+        #     "values (%s, %s, %s) "
+        #     "on duplicate key update "
+        #     "code=%s, time=%s, close_price=%s",
+        #     (code, date, close_price))
+        print (code, date, close_price)
+        self.db.commit()
+
+    def parse_tdx_day_quote_file(self, day_quote_file, date):
+        m = self.date_rexp.match(date)
+        if m is None:
+            return None
+        date = m.group(1) + m.group(2) + m.group(3)
+
+        ifile = open(day_quote_file, 'rb')
+        buf = ifile.read()
+        ifile.close()
+
+        no = len(buf)/32
+        b = 0
+        e = 32
+
+        import struct
+        for i in xrange(no):
+            data = struct.unpack('IIIIIfII', buf[b:e])
+            if(int(date) == data[0]):
+                return str(data[4]/100.0)
+            b += 32
+            e += 32
 
     def insert_securities_major_financial_kpi(self, kpi):
         cur = self.db.cursor()
@@ -145,6 +199,22 @@ class SecuritiesDB():
                     "(time, code, price, vol, tname, amount, balance) "
                     "values (%s, %s, %s, %s, %s, %s, %s)",
                     (t[0], "", 0.0, 0.0, t[1], t[2], t[3]))
+        self.db.commit()
+
+    def insert_securities_holdings(self, date):
+        cmd = subprocess.Popen('./SecuritiesHoldings.sh',
+                               stdout=subprocess.PIPE)
+        out, err = cmd.communicate()
+        holdings = out.split('\n')
+        cur = self.db.cursor()
+        for holding in holdings:
+            if (len(holding.split()) == 4):
+                h = holding.split()
+                cur.execute(
+                    "insert into securities_holding "
+                    "(time, code, price, cost, vol) "
+                    "values (%s, %s, %s, %s, %s)",
+                    (date, h[0], h[3], h[2], h[1]))
         self.db.commit()
 
 
