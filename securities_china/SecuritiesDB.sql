@@ -364,3 +364,38 @@ limit row_limit;
 end;
 //
 delimiter ;
+
+-- data collection status
+-- 汇总目前数据库中所收集数据的状态
+-- 主要包括数据的时间
+drop procedure if exists data_status;
+delimiter //
+create procedure data_status ()
+begin
+declare code_num int;
+declare quote_date date;
+declare div_year smallint;
+declare kpi_date date;
+declare sec_hold_date date;
+declare cash_hold_date date;
+declare trans_date date;
+
+select count(*) from securities_code into code_num;
+select max(time) from securities_day_quote into quote_date;
+select max(year) from securities_dividend into div_year;
+select max(time) from securities_major_financial_kpi into kpi_date;
+select max(time) from securities_holding into sec_hold_date;
+select max(time) from cash_holding into cash_hold_date;
+select max(time) from securities_transaction into trans_date;
+
+select
+  code_num 证券数量,
+  quote_date 行情日期,
+  div_year 分红年度,
+  kpi_date 指标年度,
+  sec_hold_date 证券持有日期,
+  cash_hold_date 现金持有日期,
+  trans_date 交易日期;
+end;
+//
+delimiter ;
