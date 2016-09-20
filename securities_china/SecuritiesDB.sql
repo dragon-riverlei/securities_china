@@ -227,7 +227,7 @@ create table if not exists `cash_holding` (
 
 
 -- achievement_soldout_subtotal:
--- 已结实盈(个股)，曾经持有，目前清仓的证券
+-- 已结实盈(清仓个股)，曾经持有，目前清仓的证券
 drop procedure if exists achievement_soldout_subtotal;
 delimiter //
 create procedure achievement_soldout_subtotal (in start_time date, in end_time date)
@@ -248,12 +248,11 @@ create temporary table achievement_soldout_subtotal_tmp
     sum(amount) achievement
   from securities_transaction
   where
-    code in (
-      select code from securities_holding where time = start_time and code not in (select code from securities_holding where time = end_time)
-      union
-      select code from securities_transaction where tname = '证券买入' or tname = '证券卖出' or tname = '红股入账' group by code having sum(vol)=0)
+      time > start_time and time <= end_time
     and
-    (tname = '证券买入' or tname = '证券卖出' or tname = '红股入账')
+      code not in (select code from securities_holding where time = end_time)
+    and
+      (tname = '证券买入' or tname = '证券卖出' or tname = '红股入账')
   group by code;
 select * from achievement_soldout_subtotal_tmp;
 end;
@@ -261,7 +260,7 @@ end;
 delimiter ;
 
 -- achievement_soldout_total:
--- 已结实盈(汇总)，曾经持有，目前清仓的证券
+-- 已结实盈(清仓汇总)，曾经持有，目前清仓的证券
 drop procedure if exists achievement_soldout_total;
 delimiter //
 create procedure achievement_soldout_total (in start_time date, in end_time date)
@@ -273,7 +272,7 @@ end;
 delimiter ;
 
 -- achievement_dividend_subtotal
--- 已结实盈(个股)，分红
+-- 已结实盈(分红个股)，分红
 drop procedure if exists achievement_dividend_subtotal;
 delimiter //
 create procedure achievement_dividend_subtotal (in start_time date, in end_time date)
@@ -285,9 +284,9 @@ create temporary table achievement_dividend_subtotal_tmp
     sum(amount) achievement
   from securities_transaction
   where
-    (tname = '股息入账' or tname = '股息红利税补缴')
+    (time > start_time and time <= end_time)
     and
-    (time >= start_time and time <= end_time)
+    (tname = '股息入账' or tname = '股息红利税补缴')
   group by code;
 select * from achievement_dividend_subtotal_tmp;
 end;
@@ -295,7 +294,7 @@ end;
 delimiter ;
 
 -- achievement_dividend_total
--- 已结实盈(汇总)，分红
+-- 已结实盈(分红汇总)，分红
 drop procedure if exists achievement_dividend_total;
 delimiter //
 create procedure achievement_dividend_total (in start_time date, in end_time date)
