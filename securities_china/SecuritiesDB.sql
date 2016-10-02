@@ -103,107 +103,18 @@ create table if not exists `cash_holding` (
 );
 
 
--- ====================================
--- View definitions
--- ====================================
-
--- dividend_from_2010 自2010年度以来有分红的股票
--- create or replace view dividend_from_2010 as
--- select
---   code,
---   count(year) years
--- from securities_dividend
--- where year >=2010
--- group by code;
-
--- dividend_2010_5 自2010年度以来分红等于或超过5次的股票（也就是连续5年盈利的企业）
--- create or replace view dividend_2010_5 as
--- select
---   d.code,
---   d.years,
---   c.market
--- from dividend_from_2010 d
--- join securities_code c on d.code=c.code
--- where d.years >=5
--- order by years;
-
--- short_list_01 当前市盈率在1至10之间，且自2010年度以来分红等于或超过5次的股票代码（连续5年盈利，且市盈率在10以下的企业）
--- create or replace view short_list_01 as
--- select
---   d.code,
---   q.per,
---   q.pbr
--- from securities_day_quote q
--- join dividend_2010_5 d on d.code = q.code
--- where q.per >= 1 and q.per <= 10 and q.time = '2016-07-01';
-
--- short_list_02 当前市盈率在1至10之间，市净率小于1，且自2010年度以来分红等于或超过5次的股票代码（连续5年盈利，且市盈率在10以下的企业）
--- create or replace view short_list_02 as
--- select * from short_list_01 where pbr < 1 order by pbr;
-
--- short_list_03 当前市盈率在1至20之间，且自2010年度以来分红等于或超过5次，净资产收益率超过10%，每股分红与股价比率最高的前30个股票
--- create or replace view short_list_03 as
--- select
---   d.code 代码,
---   q.per 市盈率,
---   q.pbr 市净率,
---   dp.eps 每股盈利,
---   dp.div3/10.0 每股分红,
---   dp.div3/10.0/dp.eps 分红比盈利,
---   dp.div3/q.price/10.0 分红比价格,
---   kpi.MFRation22 净资产收益率
--- from securities_day_quote q
--- join dividend_2010_5 d on d.code = q.code
--- join securities_dividend dp on d.code = dp.code
--- join securities_major_financial_kpi kpi on d.code = kpi.code
--- where q.per >= 1 and q.per <= 20 and q.time='2016-07-01' and kpi.MFRation22 >= 10 and kpi.time = '2015-12-31'
--- order by 分红比价格 desc
--- limit 30;
-
--- profitibility 公司盈利能力（资产收益率，净资产收益率）
--- create or replace view profitibility as select
---   code,
---   time,
---   MFRation2 / MFRation12 roa,
---   MFRation2 / MFRation13 roe
--- from securities_major_financial_kpi;
-
-
--- achievement_soldout_subtotal 已结实盈(个股)，曾经持有，目前清仓的证券
--- create or replace view achievement_soldout_subtotal as
--- select
---   code,
---   sum(amount) achievement
--- from securities_transaction
--- where tname = '证券买入' or tname = '证券卖出' or tname = '红股入账'
--- group by code
--- having sum(vol)=0;
-
--- achievement_soldout_total 已结实盈(汇总)，曾经持有，目前清仓的证券
--- create or replace view achievement_soldout_total as
--- select
---   sum(achievement) achievement
--- from achievement_soldout_subtotal;
-
--- achievement_dividend_subtotal 已结实盈(个股)，分红
--- create or replace view achievement_dividend_subtotal as
--- select
---   code,
---   sum(amount) achievement
--- from securities_transaction
--- where tname = '股息入账' or tname = '股息红利税补缴'
--- group by code;
-
--- achievement_dividend_subtotal 已结实盈(汇总)，分红
--- create or replace view achievement_dividend_total as
--- select
---   sum(achievement) achievement
--- from achievement_dividend_subtotal;
-
 
 -- ====================================
 -- Stored procedure definitions
 -- ====================================
+
+
+-- transaction_soldout_subtotal:回笼资金(清仓个股)，曾经持有，目前清仓的证券
+-- transaction_soldout_total:已结实盈(清仓汇总)，曾经持有，目前清仓的证券
+-- transaction_dividend_subtotal:回笼资金(分红个股)，分红
+-- transaction_dividend_total:回笼资金(分红汇总)，分红
+-- transaction_holding_subtotal:存量资金（个股）
+-- transaction_holding_total:存量资金（汇总）
 
 
 -- 计算指定时期投资账户的投资盈利P：
@@ -215,9 +126,7 @@ create table if not exists `cash_holding` (
 --     P = S1 + C1 - S0 - C0 - Cn
 -- 计算指定时期的已结实盈P1和浮动盈亏P2:
 --     已结实盈又可分为：
---         期末清仓证券所获价差盈利:
---             期初已持有
---             期间购入
+--         期末清仓证券所获价差盈利
 --         证券分红（不包括红股）
 --     浮动盈亏：
 --         期末持有的证券：
@@ -226,81 +135,168 @@ create table if not exists `cash_holding` (
 --             所得红股
 
 
--- achievement_soldout_subtotal:
+-- transaction_soldout_subtotal:
 -- 已结实盈(清仓个股)，曾经持有，目前清仓的证券
-drop procedure if exists achievement_soldout_subtotal;
+-- 要分期初已持有和期初未持有
+drop procedure if exists transaction_soldout_subtotal;
 delimiter //
-create procedure achievement_soldout_subtotal (in start_time date, in end_time date)
+create procedure transaction_soldout_subtotal (in start_time date, in end_time date)
 begin
 declare count1 int;
 declare count2 int;
 select count(*) from securities_holding where time = start_time into count1;
 select count(*) from securities_holding where time = end_time into count2;
 -- securities_holding应该明确指示证券在start_time和end_time的证券持有状态
+-- 如果在这两个时刻都没有持有任何证券，则code=None，price=cost=vol=0。
 if count1 = 0 or count2 = 0 then
   signal sqlstate '45000' set message_text = 'securities_holding contains not data for the given time range.';
 end if;
 
-drop temporary table if exists achievement_soldout_subtotal_tmp;
-create temporary table achievement_soldout_subtotal_tmp
+drop temporary table if exists transaction_soldout_subtotal_tmp;
+create temporary table transaction_soldout_subtotal_tmp
+  select
+    sd.code,
+    st.amount - price * vol amount
+  from securities_holding sd
+  join (
+        select
+          code,
+          sum(amount) amount
+        from securities_transaction
+        where time > start_time and time <= end_time
+          and (tname = '证券买入' or tname = '证券卖出' or tname = '红股入账')
+          and code in (
+                     select
+                       code
+                     from securities_holding
+                     where time = start_time
+                       and code not in (
+                                      select
+                                        code
+                                      from securities_holding
+                                      where time = end_time)) group by code) st
+  on sd.code = st.code
+  union
   select
     code,
-    sum(amount) achievement
+    sum(amount) amount
   from securities_transaction
-  where
-      time > start_time and time <= end_time
+  where time > start_time and time <= end_time
     and
-      code not in (select code from securities_holding where time = end_time)
+      code not in (select code from securities_holding where (time = start_time or time = end_time) and code <> 'None')
     and
       (tname = '证券买入' or tname = '证券卖出' or tname = '红股入账')
   group by code;
-select * from achievement_soldout_subtotal_tmp;
+
+select * from transaction_soldout_subtotal_tmp;
 end;
 //
 delimiter ;
 
--- achievement_soldout_total:
+-- transaction_soldout_total:
 -- 已结实盈(清仓汇总)，曾经持有，目前清仓的证券
-drop procedure if exists achievement_soldout_total;
+drop procedure if exists transaction_soldout_total;
 delimiter //
-create procedure achievement_soldout_total (in start_time date, in end_time date)
+create procedure transaction_soldout_total (in start_time date, in end_time date)
 begin
-call achievement_soldout_subtotal(start_time, end_time);
-select sum(achievement) from achievement_soldout_subtotal_tmp;
+call transaction_soldout_subtotal(start_time, end_time);
+select sum(amount) from transaction_soldout_subtotal_tmp;
 end;
 //
 delimiter ;
 
--- achievement_dividend_subtotal
+-- transaction_dividend_subtotal
 -- 已结实盈(分红个股)，分红
-drop procedure if exists achievement_dividend_subtotal;
+drop procedure if exists transaction_dividend_subtotal;
 delimiter //
-create procedure achievement_dividend_subtotal (in start_time date, in end_time date)
+create procedure transaction_dividend_subtotal (in start_time date, in end_time date)
 begin
-drop temporary table if exists achievement_dividend_subtotal_tmp;
-create temporary table achievement_dividend_subtotal_tmp
+drop temporary table if exists transaction_dividend_subtotal_tmp;
+create temporary table transaction_dividend_subtotal_tmp
   select
     code,
-    sum(amount) achievement
+    sum(amount) amount
   from securities_transaction
   where
     (time > start_time and time <= end_time)
     and
     (tname = '股息入账' or tname = '股息红利税补缴')
   group by code;
-select * from achievement_dividend_subtotal_tmp;
+select * from transaction_dividend_subtotal_tmp;
 end;
 //
 delimiter ;
 
--- achievement_dividend_total
+-- transaction_dividend_total
 -- 已结实盈(分红汇总)，分红
-drop procedure if exists achievement_dividend_total;
+drop procedure if exists transaction_dividend_total;
 delimiter //
-create procedure achievement_dividend_total (in start_time date, in end_time date)
+create procedure transaction_dividend_total (in start_time date, in end_time date)
 begin
-call achievement_dividend_subtotal(start_time, end_time);
-select sum(achievement) from achievement_dividend_subtotal_tmp;
+call transaction_dividend_subtotal(start_time, end_time);
+select sum(amount) from transaction_dividend_subtotal_tmp;
+end;
+//
+delimiter ;
+
+-- transaction_holding_sutotal
+-- 浮盈（个股）
+-- drop procedure if exists transaction_holding_subtotal;
+-- delimiter //
+-- create procedure transaction_holding_subtotal (in start_time date, in end_time date)
+-- begin
+-- declare count1 int;
+-- declare count2 int;
+-- select count(*) from securities_holding where time = start_time into count1;
+-- select count(*) from securities_holding where time = end_time into count2;
+-- -- securities_holding应该明确指示证券在start_time和end_time的证券持有状态
+-- -- 如果在这两个时刻都没有持有任何证券，则code=None，price=cost=vol=0。
+-- if count1 = 0 or count2 = 0 then
+--   signal sqlstate '45000' set message_text = 'securities_holding contains not data for the given time range.';
+-- end if;
+
+-- select 
+-- end;
+-- //
+-- delimiter ;
+
+-- investment_earning
+-- 投资收益（给定时间区间）
+drop procedure if exists investment_earning;
+delimiter //
+create procedure investment_earning (in start_time date, in end_time date)
+begin
+
+declare count_S0 int;
+declare count_C0 int;
+declare count_S1 int;
+declare count_C1 int;
+
+declare S0 decimal(20, 4);
+declare C0 decimal(20, 4);
+declare S1 decimal(20, 4);
+declare C1 decimal(20, 4);
+declare Cn decimal(20, 4);
+
+select count(*) from securities_holding where time = start_time into count_S0;
+select count(*) from cash_holding where time = start_time into count_C0;
+select count(*) from securities_holding where time = end_time into count_S1;
+select count(*) from cash_holding where time = end_time into count_C1;
+if count_S0 = 0 or count_S1 = 0 then
+  signal sqlstate '45000' set message_text = 'securities_holding contains not data for the given time range.';
+end if;
+if count_C0 = 0 or count_C1 = 0 then
+  signal sqlstate '45000' set message_text = 'cash_holding contains not data for the given time range.';
+end if;
+
+
+select sum(price * vol) from securities_holding where time = start_time into S0;
+select sum(price * vol) from securities_holding where time = end_time into S1;
+select amount from cash_holding where time = start_time into C0;
+select amount from cash_holding where time = end_time into C1;
+select sum(amount) from securities_transaction where (tname='银行转存' or tname='银行转取') and time > start_time and time <= end_time into Cn;
+
+select S0, C0, Cn, S1, C1, S1 + C1 - Cn - S0 - C0 earning;
 end;
 //
 delimiter ;
