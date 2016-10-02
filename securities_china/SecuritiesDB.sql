@@ -154,36 +154,44 @@ end if;
 
 drop temporary table if exists transaction_soldout_subtotal_tmp;
 create temporary table transaction_soldout_subtotal_tmp
-  select
+  select  -- 1st select clause: 期初持有，期末清仓
     sd.code,
-    st.amount - price * vol amount
+    st.amount - price * vol amount -- 期间交易金额 - 期初市值
   from securities_holding sd
   join (
-        select
-          code,
-          sum(amount) amount
-        from securities_transaction
-        where time > start_time and time <= end_time
-          and (tname = '证券买入' or tname = '证券卖出' or tname = '红股入账')
-          and code in (
-                     select
-                       code
-                     from securities_holding
-                     where time = start_time
-                       and code not in (
-                                      select
-                                        code
-                                      from securities_holding
-                                      where time = end_time)) group by code) st
+    select
+      code,
+      sum(amount) amount
+    from securities_transaction
+    where time > start_time and time <= end_time
+      and (tname = '证券买入' or tname = '证券卖出' or tname = '红股入账')
+      and
+        code in (
+          select
+            code
+          from securities_holding
+          where time = start_time
+            and code not in (
+                         select
+                           code
+                         from securities_holding
+                         where time = end_time)
+        )
+    group by code
+  ) st
   on sd.code = st.code
   union
-  select
+  select  -- 2nd select clause: 期初、期末均为持有，但期间曾持有
     code,
     sum(amount) amount
   from securities_transaction
   where time > start_time and time <= end_time
     and
-      code not in (select code from securities_holding where (time = start_time or time = end_time) and code <> 'None')
+      code not in (
+        select
+          code
+        from securities_holding
+        where (time = start_time or time = end_time) and code <> 'None')
     and
       (tname = '证券买入' or tname = '证券卖出' or tname = '红股入账')
   group by code;
