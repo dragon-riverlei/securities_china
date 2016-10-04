@@ -109,12 +109,15 @@ create table if not exists `cash_holding` (
 -- ====================================
 
 
--- transaction_soldout_subtotal:回笼资金(清仓个股)，曾经持有，目前清仓的证券
+-- transaction_soldout_subtotal:已结实盈(清仓个股)，曾经持有，目前清仓的证券
 -- transaction_soldout_total:已结实盈(清仓汇总)，曾经持有，目前清仓的证券
--- transaction_dividend_subtotal:回笼资金(分红个股)，分红
--- transaction_dividend_total:回笼资金(分红汇总)，分红
--- transaction_holding_subtotal:存量资金（个股）
--- transaction_holding_total:存量资金（汇总）
+-- transaction_dividend_subtotal:已结实盈(分红个股)，分红
+-- transaction_dividend_total:已结实盈(分红汇总)，分红
+-- transaction_holding_subtotal:浮盈（个股）
+-- transaction_holding_total:浮盈（汇总）
+-- investment_earning:投资收益（给定时间区间）
+-- short_list:条件选股
+-- data_status:汇总目前数据库中所收集数据的状态
 
 
 -- 计算指定时期投资账户的投资盈利P：
@@ -180,8 +183,10 @@ create temporary table transaction_soldout_subtotal_tmp
     group by code
   ) st
   on sd.code = st.code
+  where
+    sd.time = start_time
   union
-  select  -- 2nd select clause: 期初、期末均为持有，但期间曾持有
+  select  -- 2nd select clause: 期初、期末均未持有，但期间曾持有
     code,
     sum(amount) amount
   from securities_transaction
@@ -249,24 +254,66 @@ delimiter ;
 
 -- transaction_holding_sutotal
 -- 浮盈（个股）
--- drop procedure if exists transaction_holding_subtotal;
--- delimiter //
--- create procedure transaction_holding_subtotal (in start_time date, in end_time date)
--- begin
--- declare count1 int;
--- declare count2 int;
--- select count(*) from securities_holding where time = start_time into count1;
--- select count(*) from securities_holding where time = end_time into count2;
--- -- securities_holding应该明确指示证券在start_time和end_time的证券持有状态
--- -- 如果在这两个时刻都没有持有任何证券，则code=None，price=cost=vol=0。
--- if count1 = 0 or count2 = 0 then
---   signal sqlstate '45000' set message_text = 'securities_holding contains not data for the given time range.';
--- end if;
+drop procedure if exists transaction_holding_subtotal;
+delimiter //
+create procedure transaction_holding_subtotal (in start_time date, in end_time date)
+begin
+declare count1 int;
+declare count2 int;
+select count(*) from securities_holding where time = start_time into count1;
+select count(*) from securities_holding where time = end_time into count2;
+-- securities_holding应该明确指示证券在start_time和end_time的证券持有状态
+-- 如果在这两个时刻都没有持有任何证券，则code=None，price=cost=vol=0。
+if count1 = 0 or count2 = 0 then
+  signal sqlstate '45000' set message_text = 'securities_holding contains not data for the given time range.';
+end if;
 
--- select 
--- end;
--- //
--- delimiter ;
+drop temporary table if exists transaction_holding_subtotal_tmp;
+create temporary table transaction_holding_subtotal_tmp
+  select
+    tr.code,
+    sum(tr.amount) amount
+  from (
+    select  -- 1st select clause: 期初市值
+      code,
+      - price * vol amount
+    from securities_holding
+    where time = start_time and code <> 'None'
+      and code in (select code from securities_holding where time = end_time)
+    union
+    select  -- 2nd select clause: 期末市值
+      code,
+      price * vol amount
+    from securities_holding
+    where time = end_time and code <> 'None'
+    union
+    select  -- 3rd select clause: 期间交易金额
+      code,
+      sum(amount) amount
+    from securities_transaction
+    where time > start_time and time <= end_time
+      and code in (select code from securities_holding where time = end_time)
+      and (tname = '证券买入' or tname = '证券卖出' or tname = '红股入账')
+    group by code
+  ) tr
+  group by tr.code;
+select * from transaction_holding_subtotal_tmp;
+end;
+//
+delimiter ;
+
+-- transaction_holding_total
+-- 浮盈（汇总）
+drop procedure if exists transaction_holding_total;
+delimiter //
+create procedure transaction_holding_total (in start_time date, in end_time date)
+begin
+call transaction_holding_subtotal(start_time, end_time);
+select sum(amount) from transaction_holding_subtotal_tmp;
+end;
+//
+delimiter ;
+
 
 -- investment_earning
 -- 投资收益（给定时间区间）
