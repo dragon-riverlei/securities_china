@@ -108,7 +108,6 @@ create table if not exists `cash_holding` (
 -- Stored procedure definitions
 -- ====================================
 
-
 -- transaction_soldout_subtotal:已结实盈(清仓个股)，曾经持有，目前清仓的证券
 -- transaction_soldout_total:已结实盈(清仓汇总)，曾经持有，目前清仓的证券
 -- transaction_dividend_subtotal:已结实盈(分红个股)，分红
@@ -117,6 +116,8 @@ create table if not exists `cash_holding` (
 -- transaction_holding_total:浮盈（汇总）
 -- investment_earning:投资收益（给定时间区间）
 -- short_list:条件选股
+-- short_list_code:条件选股，只返回代码
+-- short_list_detail:条件选股，返回详细信息
 -- data_status:汇总目前数据库中所收集数据的状态
 
 
@@ -375,42 +376,105 @@ create procedure short_list (
        in pbr_u decimal(4,2), -- 市净率上限，基于securities_day_quote中最新日期
        in roe_l decimal(4,2), -- 净资产收益率下限，基于securities_major_financial_kpi中最新日期
        in roe_u decimal(4,2), -- 净资产收益率上限，基于securities_major_financial_kpi中最新日期
-       in row_limit tinyint -- 返回满足条件的证券数量上限
+       in row_limit int -- 返回满足条件的证券数量上限
        )
 begin
 declare quote_date date;
 declare kpi_date date;
 select max(time) from securities_day_quote into quote_date;
 select max(time) from securities_major_financial_kpi where time like '%-12-31' into kpi_date;
-select
-  d.code 代码,
-  q.per 市盈率,
-  q.pbr 市净率,
-  d.eps 每股盈利,
-  d.div3/10.0 每股分红,
-  d.div3/10.0/d.eps 分红比盈利,
-  d.div3/q.price/10.0 分红比价格,
-  k.MFRation22 净资产收益率
-from securities_dividend d
-join securities_day_quote q on q.code = d.code
-join securities_major_financial_kpi k on k.code = d.code
-where
-  q.time = quote_date and k.time = kpi_date
-  and q.per >= per_l and q.per <= per_u
-  and q.pbr >= pbr_l and q.pbr <= pbr_u
-  and k.MFRation22 >= roe_l and k.MFRation22 <= roe_u
-  and d.year >= (div_inception_year + div_years - 1)
-  and d.code in (
-    select code from (
-      select
-        code,
-        count(year)
-      from securities_dividend
-      where year >= div_inception_year
-      group by code
-      having count(year) >= div_years) div_code)
-order by 分红比价格 desc
-limit row_limit;
+drop temporary table if exists short_list_tmp;
+create temporary table short_list_tmp
+  select
+    d.code 代码,
+    q.per 市盈率,
+    q.pbr 市净率,
+    d.eps 每股盈利,
+    d.div3/10.0 每股分红,
+    d.div3/10.0/d.eps 分红比盈利,
+    d.div3/q.price/10.0 分红比价格,
+    k.MFRation22 净资产收益率
+  from securities_dividend d
+  join securities_day_quote q on q.code = d.code
+  join securities_major_financial_kpi k on k.code = d.code
+  where
+    q.time = quote_date and k.time = kpi_date
+    and q.per >= per_l and q.per <= per_u
+    and q.pbr >= pbr_l and q.pbr <= pbr_u
+    and k.MFRation22 >= roe_l and k.MFRation22 <= roe_u
+    and d.year = (div_inception_year + div_years - 1)
+    and d.code in (
+      select code from (
+        select
+          code,
+          count(year)
+        from securities_dividend
+        where year >= div_inception_year
+        group by code
+        having count(year) >= div_years) div_code)
+  order by 分红比价格 desc
+  limit row_limit;
+end;
+//
+delimiter ;
+
+drop procedure if exists short_list_code;
+delimiter //
+create procedure short_list_code (
+       in div_inception_year smallint, -- 分红起始年份
+       in div_years tinyint, -- 分红年数
+       in per_l decimal(4,2), -- 市盈率下限，基于securities_day_quote中最新日期
+       in per_u decimal(4,2), -- 市盈率上限，基于securities_day_quote中最新日期
+       in pbr_l decimal(4,2), -- 市净率下限，基于securities_day_quote中最新日期
+       in pbr_u decimal(4,2), -- 市净率上限，基于securities_day_quote中最新日期
+       in roe_l decimal(4,2), -- 净资产收益率下限，基于securities_major_financial_kpi中最新日期
+       in roe_u decimal(4,2), -- 净资产收益率上限，基于securities_major_financial_kpi中最新日期
+       in row_limit int -- 返回满足条件的证券数量上限
+       )
+begin
+call short_list(div_inception_year, div_years, per_l, per_u, pbr_l, pbr_u, roe_l, roe_u, row_limit);
+select 代码 code from short_list_tmp;
+end;
+//
+delimiter ;
+
+drop procedure if exists short_list_detail;
+delimiter //
+create procedure short_list_detail (
+       in div_inception_year smallint, -- 分红起始年份
+       in div_years tinyint, -- 分红年数
+       in per_l decimal(4,2), -- 市盈率下限，基于securities_day_quote中最新日期
+       in per_u decimal(4,2), -- 市盈率上限，基于securities_day_quote中最新日期
+       in pbr_l decimal(4,2), -- 市净率下限，基于securities_day_quote中最新日期
+       in pbr_u decimal(4,2), -- 市净率上限，基于securities_day_quote中最新日期
+       in roe_l decimal(4,2), -- 净资产收益率下限，基于securities_major_financial_kpi中最新日期
+       in roe_u decimal(4,2), -- 净资产收益率上限，基于securities_major_financial_kpi中最新日期
+       in row_limit int -- 返回满足条件的证券数量上限
+       )
+begin
+call short_list(div_inception_year, div_years, per_l, per_u, pbr_l, pbr_u, roe_l, roe_u, row_limit);
+select * from short_list_tmp;
+end;
+//
+delimiter ;
+
+drop procedure if exists short_list_detail_default;
+delimiter //
+create procedure short_list_detail_default ()
+begin
+declare div_inception_year smallint;
+declare div_years tinyint;
+declare per_l decimal(4,2);
+declare per_u decimal(4,2);
+declare pbr_l decimal(4,2);
+declare pbr_u decimal(4,2);
+declare roe_l decimal(4,2);
+declare roe_u decimal(4,2);
+declare row_limit int;
+
+
+call short_list(div_inception_year, div_years, per_l, per_u, pbr_l, pbr_u, roe_l, roe_u, row_limit);
+select * from short_list_tmp;
 end;
 //
 delimiter ;
