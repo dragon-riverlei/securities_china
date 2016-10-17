@@ -7,6 +7,8 @@ import MySQLdb
 
 import subprocess
 
+import time
+
 import re
 
 
@@ -31,18 +33,14 @@ class SecuritiesDB():
                                   charset="utf8")
 
     def query_securities_code(self):
-        self.db.query("select * from securities_code")
+        self.db.query("select code, market, country from securities_code")
         return self.db.store_result()
 
     def query_securities_code_with_market(self):
         self.db.query("select code, market from securities_code")
         return self.db.store_result()
 
-    def query_dividend_prone_securities(self):
-        self.db.query("select code,market from dividend_2010_5")
-        return self.db.store_result()
-
-    def query_securities_code_without_dividend_plan(self, years):
+    def query_securities_code_for_dividend_plan(self, years):
         if(years is not None):
             sql = " union ".join(
                 ["select code from securities_code where code not in "
@@ -53,21 +51,16 @@ class SecuritiesDB():
         self.db.query(sql)
         return self.db.store_result()
 
-    def query_short_list_01(self):
-        self.db.query("select code from short_list_01")
-        return self.db.store_result()
-
-    def query_invst_profit(self, start, end):
-        pass
-
-    def query_portfolio_value(time):
-        pass
-
-    def query_cash_deposit(time):
-        pass
-
-    def query_net_cashflow(time):
-        pass
+    def query_short_list(self, start_year=time.localtime().tm_year-6,
+                         num_years=5, per_l=0, per_u=1000,
+                         pbr_l=0, pbr_u=1000,
+                         roe_l=0, roe_u=1000,
+                         row_limit=1000):
+        cur = self.db.cursor()
+        cur.callproc("short_list",
+                     (start_year, num_years, per_l, per_u, pbr_l, pbr_u,
+                      roe_l, roe_u, row_limit))
+        return cur.fetchall()
 
     def insert_securities_code(self, codes):
         cur = self.db.cursor()
@@ -84,9 +77,13 @@ class SecuritiesDB():
             cur.execute(
                 "insert into securities_dividend "
                 "values (%s, %s, %s, %s, %s, %s, %s, %s) "
-                "on duplicate key update code=%s, year=%s",
+                "on duplicate key update code=%s, year=%s, "
+                "eps=%s, div1=%s, div2=%s, div3=%s, reg_time=%s, "
+                "div_time=%s",
                 (div[0], div[1], div[2], div[3], div[4], div[5],
-                 div[6], div[7], div[0], div[1]))
+                 div[6], div[7],
+                 div[0], div[1], div[2], div[3], div[4], div[5],
+                 div[6], div[7]))
         self.db.commit()
 
     def insert_securities_dividend_plan(self, dividends):
