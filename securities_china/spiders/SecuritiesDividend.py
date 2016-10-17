@@ -2,10 +2,20 @@
 #
 # 上海，深圳证券分红
 # http://stock.finance.qq.com/corp1/distri.php?zqdm=${code}
+#
+# Example:
+# scrapy crawl SecuritiesDividendPlan -a years=2015
+# scrapy crawl SecuritiesDividendPlan -a years=2015,2016
+# scrapy crawl SecuritiesDividendPlan -a years=2015,2016 -a codes=600000
+# scrapy crawl SecuritiesDividendPlan -a years=2015,2016 -a codes=600000,600036
 
 import scrapy
 
+import logging
+
 from securities_china.SecuritiesDB import SecuritiesDB
+
+logger = logging.getLogger(__name__)
 
 
 class SecuritiesDividend(scrapy.Spider):
@@ -14,9 +24,31 @@ class SecuritiesDividend(scrapy.Spider):
     name = "SecuritiesDividend"
     allowed_domains = ["stock.finance.qq.com"]
     url_tpl = "http://stock.finance.qq.com/corp1/distri.php?zqdm="
-    start_urls = [
-        url_tpl + code[0] for code in db.query_securities_code().fetch_row(0)
-    ]
+
+    def __init__(self, years=None, codes=None):
+        if (years is not None):
+            self.years = years.split(",")
+            logger.info("scrape securities dividend for years: " + years)
+        else:
+            self.years = None
+            logger.info("scrape securities dividend for all years.")
+
+        if (codes is not None):
+            self.codes = codes.split(",")
+            logger.info("scrape securities dividend for codes: " + codes)
+        else:
+            self.codes = None
+            logger.info("scrape securities dividend for all codes.")
+
+        if (self.codes is not None):
+            self.start_urls = [self.url_tpl + code for code in self.codes]
+        else:
+            self.start_urls = [
+                self.url_tpl + code[0]
+                for code in
+                self.db.query_securities_code()
+                .fetch_row(maxrows=0)
+            ]
 
     def parse(self, response):
         self.db.insert_securities_dividend(self.merge_rows(response))
@@ -41,8 +73,10 @@ class SecuritiesDividend(scrapy.Spider):
                 eps = Decimal(item[2])
                 reg_time = item[6]
                 div_time = item[7]
-            yield (code, year, str(eps), str(div1), str(div2), str(div3),
-                   reg_time, div_time)
+            record = (code, year, str(eps), str(div1), str(div2), str(div3),
+                      reg_time, div_time)
+            logger.info("merged: " + str(record))
+            yield record
 
     def parse_rows(self, response):
         code = response.url.split("zqdm=")[1]
@@ -56,4 +90,8 @@ class SecuritiesDividend(scrapy.Spider):
             div3 = values[4] if values[4] != "--" else "0.0"
             reg_time = values[5] if values[5] != "--" else "1970-01-01"
             div_time = values[6] if values[6] != "--" else "1970-01-01"
-            yield (code, year, eps, div1, div2, div3, reg_time, div_time)
+            if (self.years is None or year in self.years):
+                record = (code, year, eps, div1, div2, div3,
+                          reg_time, div_time)
+                logger.info("parsed: " + str(record))
+                yield record

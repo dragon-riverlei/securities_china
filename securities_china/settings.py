@@ -9,6 +9,8 @@
 #     http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 #     http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 
+import scrapy
+
 BOT_NAME = 'securities_china'
 
 SPIDER_MODULES = ['securities_china.spiders']
@@ -26,7 +28,7 @@ NEWSPIDER_MODULE = 'securities_china.spiders'
 # See also autothrottle settings and docs
 #DOWNLOAD_DELAY=3
 # The download delay setting will honor only one of:
-#CONCURRENT_REQUESTS_PER_DOMAIN=16
+CONCURRENT_REQUESTS_PER_DOMAIN=16
 #CONCURRENT_REQUESTS_PER_IP=16
 
 # Disable cookies (enabled by default)
@@ -68,11 +70,11 @@ NEWSPIDER_MODULE = 'securities_china.spiders'
 # Enable and configure the AutoThrottle extension (disabled by default)
 # See http://doc.scrapy.org/en/latest/topics/autothrottle.html
 # NOTE: AutoThrottle will honour the standard settings for concurrency and delay
-#AUTOTHROTTLE_ENABLED=True
+AUTOTHROTTLE_ENABLED=True
 # The initial download delay
-#AUTOTHROTTLE_START_DELAY=5
+AUTOTHROTTLE_START_DELAY=5
 # The maximum download delay to be set in case of high latencies
-#AUTOTHROTTLE_MAX_DELAY=60
+AUTOTHROTTLE_MAX_DELAY=60
 # Enable showing throttling stats for every response received:
 #AUTOTHROTTLE_DEBUG=False
 
@@ -83,3 +85,13 @@ NEWSPIDER_MODULE = 'securities_china.spiders'
 #HTTPCACHE_DIR='httpcache'
 #HTTPCACHE_IGNORE_HTTP_CODES=[]
 #HTTPCACHE_STORAGE='scrapy.extensions.httpcache.FilesystemCacheStorage'
+
+
+LOG_FILE='../securities_china.log'
+LOG_ENABLED=True
+LOG_ENCODING='utf-8'
+LOG_LEVEL='DEBUG'
+LOG_FORMAT='%(asctime)s [%(name)s] %(levelname)s %(message)s'
+
+
+scrapy.utils.log.configure_logging(install_root_handler=True)
