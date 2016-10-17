@@ -118,6 +118,7 @@ create table if not exists `cash_holding` (
 -- short_list:条件选股
 -- short_list_code:条件选股，只返回代码
 -- short_list_detail:条件选股，返回详细信息
+-- short_list_detail_default:条件选股（使用缺省条件），返回详细信息
 -- data_status:汇总目前数据库中所收集数据的状态
 
 
@@ -370,12 +371,12 @@ delimiter //
 create procedure short_list (
        in div_inception_year smallint, -- 分红起始年份
        in div_years tinyint, -- 分红年数
-       in per_l decimal(4,2), -- 市盈率下限，基于securities_day_quote中最新日期
-       in per_u decimal(4,2), -- 市盈率上限，基于securities_day_quote中最新日期
-       in pbr_l decimal(4,2), -- 市净率下限，基于securities_day_quote中最新日期
-       in pbr_u decimal(4,2), -- 市净率上限，基于securities_day_quote中最新日期
-       in roe_l decimal(4,2), -- 净资产收益率下限，基于securities_major_financial_kpi中最新日期
-       in roe_u decimal(4,2), -- 净资产收益率上限，基于securities_major_financial_kpi中最新日期
+       in per_l decimal(10,2), -- 市盈率下限，基于securities_day_quote中最新日期
+       in per_u decimal(10,2), -- 市盈率上限，基于securities_day_quote中最新日期
+       in pbr_l decimal(10,2), -- 市净率下限，基于securities_day_quote中最新日期
+       in pbr_u decimal(10,2), -- 市净率上限，基于securities_day_quote中最新日期
+       in roe_l decimal(10,2), -- 净资产收益率下限，基于securities_major_financial_kpi中最新日期
+       in roe_u decimal(10,2), -- 净资产收益率上限，基于securities_major_financial_kpi中最新日期
        in row_limit int -- 返回满足条件的证券数量上限
        )
 begin
@@ -423,12 +424,12 @@ delimiter //
 create procedure short_list_code (
        in div_inception_year smallint, -- 分红起始年份
        in div_years tinyint, -- 分红年数
-       in per_l decimal(4,2), -- 市盈率下限，基于securities_day_quote中最新日期
-       in per_u decimal(4,2), -- 市盈率上限，基于securities_day_quote中最新日期
-       in pbr_l decimal(4,2), -- 市净率下限，基于securities_day_quote中最新日期
-       in pbr_u decimal(4,2), -- 市净率上限，基于securities_day_quote中最新日期
-       in roe_l decimal(4,2), -- 净资产收益率下限，基于securities_major_financial_kpi中最新日期
-       in roe_u decimal(4,2), -- 净资产收益率上限，基于securities_major_financial_kpi中最新日期
+       in per_l decimal(10,2), -- 市盈率下限，基于securities_day_quote中最新日期
+       in per_u decimal(10,2), -- 市盈率上限，基于securities_day_quote中最新日期
+       in pbr_l decimal(10,2), -- 市净率下限，基于securities_day_quote中最新日期
+       in pbr_u decimal(10,2), -- 市净率上限，基于securities_day_quote中最新日期
+       in roe_l decimal(10,2), -- 净资产收益率下限，基于securities_major_financial_kpi中最新日期
+       in roe_u decimal(10,2), -- 净资产收益率上限，基于securities_major_financial_kpi中最新日期
        in row_limit int -- 返回满足条件的证券数量上限
        )
 begin
@@ -443,12 +444,12 @@ delimiter //
 create procedure short_list_detail (
        in div_inception_year smallint, -- 分红起始年份
        in div_years tinyint, -- 分红年数
-       in per_l decimal(4,2), -- 市盈率下限，基于securities_day_quote中最新日期
-       in per_u decimal(4,2), -- 市盈率上限，基于securities_day_quote中最新日期
-       in pbr_l decimal(4,2), -- 市净率下限，基于securities_day_quote中最新日期
-       in pbr_u decimal(4,2), -- 市净率上限，基于securities_day_quote中最新日期
-       in roe_l decimal(4,2), -- 净资产收益率下限，基于securities_major_financial_kpi中最新日期
-       in roe_u decimal(4,2), -- 净资产收益率上限，基于securities_major_financial_kpi中最新日期
+       in per_l decimal(10,2), -- 市盈率下限，基于securities_day_quote中最新日期
+       in per_u decimal(10,2), -- 市盈率上限，基于securities_day_quote中最新日期
+       in pbr_l decimal(10,2), -- 市净率下限，基于securities_day_quote中最新日期
+       in pbr_u decimal(10,2), -- 市净率上限，基于securities_day_quote中最新日期
+       in roe_l decimal(10,2), -- 净资产收益率下限，基于securities_major_financial_kpi中最新日期
+       in roe_u decimal(10,2), -- 净资产收益率上限，基于securities_major_financial_kpi中最新日期
        in row_limit int -- 返回满足条件的证券数量上限
        )
 begin
@@ -464,17 +465,27 @@ create procedure short_list_detail_default ()
 begin
 declare div_inception_year smallint;
 declare div_years tinyint;
-declare per_l decimal(4,2);
-declare per_u decimal(4,2);
-declare pbr_l decimal(4,2);
-declare pbr_u decimal(4,2);
-declare roe_l decimal(4,2);
-declare roe_u decimal(4,2);
+declare per_l decimal(10,2);
+declare per_u decimal(10,2);
+declare pbr_l decimal(10,2);
+declare pbr_u decimal(10,2);
+declare roe_l decimal(10,2);
+declare roe_u decimal(10,2);
 declare row_limit int;
 
+set div_years = 5;
+set div_inception_year = year(now()) - div_years;
+set per_l = 0.01;
+set per_u = 20;
+set pbr_l = 0.01;
+set pbr_u = 5;
+set roe_l = 10;
+set roe_u = 999;
+set row_limit = 200;
 
 call short_list(div_inception_year, div_years, per_l, per_u, pbr_l, pbr_u, roe_l, roe_u, row_limit);
 select * from short_list_tmp;
+select div_inception_year, div_years, per_l, per_u, pbr_l, pbr_u, roe_l, roe_u, row_limit;
 end;
 //
 delimiter ;
