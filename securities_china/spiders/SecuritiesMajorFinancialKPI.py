@@ -10,20 +10,17 @@
 from __future__ import print_function
 import scrapy
 import re
+import logging
 
 from securities_china.SecuritiesDB import SecuritiesDB
 
+logger = logging.getLogger(__name__)
+
 
 class SecuritiesMajorFinancialKPI (scrapy.Spider):
-    db = SecuritiesDB()
-
     name = "SecuritiesMajorFinancialKPI"
     allowed_domains = ["stock.finance.qq.com"]
     url_tpl = "http://stock.finance.qq.com/corp1/mfratio.php?zqdm="
-    start_urls = [
-        url_tpl + code[0]
-        for code in db.query_securities_code().fetch_row(maxrows=0)
-    ]
     time_rexp = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
     unit_rexp = re.compile(r"[^0-9,.]*$")
     kpis = [
@@ -52,9 +49,17 @@ class SecuritiesMajorFinancialKPI (scrapy.Spider):
                 date[:4] for date in self.dates
                 if self.time_rexp.match(date) is not None
             }
+            logger.info("scrape securities financial kpis on " + str(dates))
         else:
             self.dates = None
             self.years = None
+            logger.info("scrape securities financial kpis")
+
+        self.db = SecuritiesDB()
+        self.start_urls = [
+            self.url_tpl + code[0]
+            for code in self.db.query_securities_code().fetch_row(maxrows=0)
+        ]
 
     def parse(self, response):
         links = response.xpath(
@@ -92,6 +97,7 @@ class SecuritiesMajorFinancialKPI (scrapy.Spider):
             values = [value if value != "" else "0.0000" for value in values]
             values = [value.replace(",", "") for value in values]
             values = [code, times[i]] + values
+            logger.info("kpi: " + str(values))
             self.db.insert_securities_major_financial_kpi(values)
 
     def kpiNames(self, response):
