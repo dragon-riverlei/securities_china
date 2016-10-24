@@ -16,12 +16,13 @@ class SecuritiesStockStructure(scrapy.Spider):
     name = "SecuritiesStockStructure"
     allowed_domains = ["stock.finance.qq.com"]
     url_tpl = "http://stock.finance.qq.com/corp1/stk_struct.php?zqdm="
-    start_urls = [
-        url_tpl + code[0]
-        for code in db.query_short_list_01().fetch_row(maxrows=0)
-    ]
     time_rexp = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
     parts = [("变更原因", 3), ("总股本", 5), ("流通股份", 6), ("流通A股", 7), ("流通H股", 9)]
+
+    def __init__(self):
+        self.start_urls = [
+            self.url_tpl + code[0]
+            for code in self.db.query_short_list()]
 
     def parse(self, response):
         self.parseStockStructure(response)
