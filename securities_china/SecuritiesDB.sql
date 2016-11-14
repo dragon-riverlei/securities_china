@@ -101,7 +101,18 @@ create table if not exists `cash_holding` (
        `time` date not null, -- 日期
        `amount` decimal(20,4) -- 金额（元）
 );
-
+create table if not exists `fund_type` (
+       `id` int unsigned not null primary key auto_increment,
+       `name` varchar(10) not null   -- 基金类型
+);
+create table if not exists `fund_code` (
+       `code` varchar(6) primary key, -- 基金代码
+       `name` varchar(20) not null,   -- 基金名称
+       `type` int unsigned not null,   -- 基金类型
+       foreign key (type)
+               references fund_type(id)
+               on delete restrict
+);
 
 
 -- ====================================
