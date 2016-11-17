@@ -214,6 +214,15 @@ class SecuritiesDB():
                     (date, h[0], h[3], h[2], h[1]))
         self.db.commit()
 
+    def insert_fund_code(self, code):
+        cur = self.db.cursor()
+        cur.execute(
+            "insert into fund_code "
+            "(code, name, type) "
+            "values (%s, %s, %s) "
+            "on duplicate key update", code)
+        self.db.commit()
+
 
 if __name__ == "__main__":
     sdb = SecuritiesDB()

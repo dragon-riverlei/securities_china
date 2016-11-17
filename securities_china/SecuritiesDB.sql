@@ -106,9 +106,10 @@ create table if not exists `fund_type` (
        `name` varchar(10) not null   -- 基金类型
 );
 create table if not exists `fund_code` (
-       `code` varchar(6) primary key, -- 基金代码
+       `code` varchar(6) not null, -- 基金代码
        `name` varchar(20) not null,   -- 基金名称
        `type` int unsigned not null,   -- 基金类型
+       primary key (code, type),
        foreign key (type)
                references fund_type(id)
                on delete restrict
