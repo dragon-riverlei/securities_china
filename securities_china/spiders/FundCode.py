@@ -35,11 +35,17 @@ class FundCode(scrapy.Spider):
             "//div[@class='filter_result_list']/"
             "div[@class='bottom']/div[@class='pages']/"
             "span[@class='countPage']/text()")[0].extract()
-        response.xpath("//div[@class='filter_result_list']/"
-                       "div[@class='result_list_table']/"
-                       "table/tbody/tr/td/input")
+        funds = response.xpath("//div[@class='filter_result_list']/"
+                               "div[@class='result_list_table']/"
+                               "table/tbody/tr/td/input")
+        fund_type = self.fund_types[response.url.split("&")[0].split("=")[1]]
+        for fund in funds:
+            code = fund.xpath("@jjdm").extract()[0]
+            name = fund.xpath("@jjjc").extract()[0]
+            f = (code, name, fund_type)
+            logger.info("Fund code: " + str(f))
         if int(currentPage) < int(countPage):
             yield scrapy.Request(
-                response.url.split("&")[0] + "&page=" + (int(currentPage) + 1),
+                response.url.split("&")[0] +
+                "&page=" + str(int(currentPage) + 1),
                 self.parse)
-        pass
