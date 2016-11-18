@@ -19,13 +19,12 @@ logger = logging.getLogger(__name__)
 
 
 class SecuritiesDayQuote(scrapy.Spider):
-    db = SecuritiesDB()
-
     name = "SecuritiesDayQuote"
     allowed_domains = ["qt.gtimg.cn"]
     url_tpl = "http://qt.gtimg.cn/q="
 
     def __init__(self):
+        self.db = SecuritiesDB()
         self.start_urls = [
             self.url_tpl + "sh" + code[0]
             if code[1] == "Shanghai" else self.url_tpl + "sz" + code[0]

@@ -11,8 +11,6 @@ from securities_china.SecuritiesDB import SecuritiesDB
 
 
 class SecuritiesStockStructure(scrapy.Spider):
-    db = SecuritiesDB()
-
     name = "SecuritiesStockStructure"
     allowed_domains = ["stock.finance.qq.com"]
     url_tpl = "http://stock.finance.qq.com/corp1/stk_struct.php?zqdm="
@@ -20,6 +18,7 @@ class SecuritiesStockStructure(scrapy.Spider):
     parts = [("变更原因", 3), ("总股本", 5), ("流通股份", 6), ("流通A股", 7), ("流通H股", 9)]
 
     def __init__(self):
+        self.db = SecuritiesDB()
         self.start_urls = [
             self.url_tpl + code[0]
             for code in self.db.query_short_list()]

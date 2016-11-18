@@ -19,13 +19,12 @@ logger = logging.getLogger(__name__)
 
 
 class SecuritiesDividend(scrapy.Spider):
-    db = SecuritiesDB()
-
     name = "SecuritiesDividend"
     allowed_domains = ["stock.finance.qq.com"]
     url_tpl = "http://stock.finance.qq.com/corp1/distri.php?zqdm="
 
     def __init__(self, years=None, codes=None):
+        self.db = SecuritiesDB()
         if (years is not None):
             self.years = years.split(",")
             logger.info("scrape securities dividend for years: " + years)

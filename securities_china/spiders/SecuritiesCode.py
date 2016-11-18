@@ -16,10 +16,14 @@ class SecuritiesCode(scrapy.Spider):
     name = "SecuritiesCode"
     allowed_domains = ["stock.gtimg.cn"]
     start_urls = [
-        "http://stock.gtimg.cn/data/get_hs_xls.php?id=rankash&type=1&metric=chr",
-        "http://stock.gtimg.cn/data/get_hs_xls.php?id=rankasz&type=1&metric=chr"
+        "http://stock.gtimg.cn/data/get_hs_xls.php?"
+        "id=rankash&type=1&metric=chr",
+        "http://stock.gtimg.cn/data/get_hs_xls.php?"
+        "id=rankasz&type=1&metric=chr"
     ]
-    db = SecuritiesDB()
+
+    def __init__(self):
+        self.db = SecuritiesDB()
 
     def parse(self, response):
         sheet = open_workbook(file_contents=response.body).sheets()[0]
