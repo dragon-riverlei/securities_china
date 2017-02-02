@@ -214,13 +214,25 @@ class SecuritiesDB():
                     (date, h[0], h[3], h[2], h[1]))
         self.db.commit()
 
-    def insert_fund_code(self, code):
+    def insert_fund_company(self, fund_company):
+        cur = self.db.cursor()
+        cur.execute(
+            "insert into fund_company "
+            "(id, name, time, asset) "
+            "values (%s, %s, %s, %s) "
+            "on duplicate key update "
+            "id=%s, name=%s, time=%s, asset=%s",
+            fund_company + fund_company)
+        self.db.commit()
+
+    def insert_fund_code(self, fund_code):
         cur = self.db.cursor()
         cur.execute(
             "insert into fund_code "
             "(code, name, type) "
             "values (%s, %s, %s) "
-            "on duplicate key update", code)
+            "on duplicate key update code=%s, type=%s",
+            fund_code + (fund_code[0], fund_code[2]))
         self.db.commit()
 
 

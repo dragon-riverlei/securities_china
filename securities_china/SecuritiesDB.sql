@@ -101,9 +101,23 @@ create table if not exists `cash_holding` (
        `time` date not null, -- 日期
        `amount` decimal(20,4) -- 金额（元）
 );
+create table if not exists `fund_company` (
+       `id` int unsigned not null primary key, -- 基金公司HowBuy代码
+       `name` varchar(10) not null,   -- 基金公司名称
+       `time` date not null, -- 成立日期
+       `asset` decimal(20,4)  -- 资产规模（亿元）
+);
 create table if not exists `fund_type` (
        `id` int unsigned not null primary key auto_increment,
        `name` varchar(10) not null   -- 基金类型
+                                     -- 1. 股票型
+                                     -- 2. 混合型
+                                     -- 3. QDII
+                                     -- 4. 指数型
+                                     -- 5. 债券型
+                                     -- 6. 货币型
+                                     -- 7. 理财型
+                                     -- 8. 保本型
 );
 create table if not exists `fund_code` (
        `code` varchar(6) not null, -- 基金代码
