@@ -9,7 +9,8 @@ use securities;
 create table if not exists `securities_code` (
        `code` varchar(6) primary key, -- 证券代码
        `market` varchar(10) not null, -- 证券市场名称
-       `country` varchar(5) not null  -- 证券市场所在国家
+       `country` varchar(5) not null,  -- 证券市场所在国家
+       `name` varchar(10) not null -- 证券名称
 );
 create table if not exists `securities_dividend` (
        `code` varchar(6) not null, -- 证券代码
@@ -379,7 +380,7 @@ select amount from cash_holding where time = start_time into C0;
 select amount from cash_holding where time = end_time into C1;
 select sum(amount) from securities_transaction where (tname='银行转存' or tname='银行转取') and time > start_time and time <= end_time into Cn;
 
-select S0, C0, Cn, S1, C1, S1 + C1 - Cn - S0 - C0 earning;
+select S0 '期初市值', C0 '期初现金', Cn '期间现金净流入', S1 '期末市值', C1 '期末现金', S1 + C1 - Cn - S0 - C0 '期间收益';
 end;
 //
 delimiter ;
@@ -409,18 +410,18 @@ begin
 declare quote_date date;
 declare kpi_date date;
 select max(time) from securities_day_quote into quote_date;
-select max(time) from securities_major_financial_kpi where time like '%-12-31' into kpi_date;
+select max(time) from securities_major_financial_kpi where time like '%-12-31' and year(time) <= (div_inception_year + div_years - 1) into kpi_date;
 drop temporary table if exists short_list_tmp;
 create temporary table short_list_tmp
   select
     d.code 代码,
-    q.per 市盈率,
-    q.pbr 市净率,
-    d.eps 每股盈利,
-    d.div3/10.0 每股分红,
-    d.div3/10.0/d.eps 分红比盈利,
     d.div3/q.price/10.0 分红比价格,
-    k.MFRation22 净资产收益率
+    q.per 市盈率,
+    k.MFRation22 净资产收益率,
+    q.pbr 市净率,
+    d.div3/10.0/d.eps 分红比盈利,
+    d.eps 每股盈利,
+    d.div3/10.0 每股分红
   from securities_dividend d
   join securities_day_quote q on q.code = d.code
   join securities_major_financial_kpi k on k.code = d.code
@@ -439,7 +440,7 @@ create temporary table short_list_tmp
         where year >= div_inception_year
         group by code
         having count(year) >= div_years) div_code)
-  order by 分红比价格 desc
+  order by 分红比价格 desc, 市盈率, 净资产收益率 desc,  市净率, 分红比盈利
   limit row_limit;
 end;
 //
@@ -487,27 +488,23 @@ delimiter ;
 
 drop procedure if exists short_list_detail_default;
 delimiter //
-create procedure short_list_detail_default ()
+create procedure short_list_detail_default (
+       in div_inception_year smallint, -- 分红起始年份
+       in div_years tinyint, -- 分红年数
+       in per_u decimal(10,2), -- 市盈率上限，基于securities_day_quote中最新日期
+       in pbr_u decimal(10,2), -- 市净率上限，基于securities_day_quote中最新日期
+       in roe_u decimal(10,2), -- 净资产收益率上限，基于securities_major_financial_kpi中最新日期
+       in row_limit int -- 返回满足条件的证券数量上限
+       )
 begin
-declare div_inception_year smallint;
-declare div_years tinyint;
-declare per_l decimal(10,2);
-declare per_u decimal(10,2);
-declare pbr_l decimal(10,2);
-declare pbr_u decimal(10,2);
-declare roe_l decimal(10,2);
-declare roe_u decimal(10,2);
-declare row_limit int;
 
-set div_years = 5;
-set div_inception_year = year(now()) - div_years;
+declare per_l decimal(10,2);
+declare pbr_l decimal(10,2);
+declare roe_l decimal(10,2);
+
 set per_l = 0.01;
-set per_u = 20;
 set pbr_l = 0.01;
-set pbr_u = 5;
 set roe_l = 10;
-set roe_u = 999;
-set row_limit = 200;
 
 call short_list(div_inception_year, div_years, per_l, per_u, pbr_l, pbr_u, roe_l, roe_u, row_limit);
 select * from short_list_tmp;

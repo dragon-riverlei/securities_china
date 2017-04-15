@@ -90,11 +90,15 @@ class SecuritiesDB():
         cur = self.db.cursor()
         for div in dividends:
             cur.execute(
-                "insert into securities_dividend_plan "
-                "values (%s, %s, %s, %s, %s, %s) "
-                "on duplicate key update code=%s, year=%s",
+                "insert into securities_dividend "
+                "values (%s, %s, %s, %s, %s, %s, %s, %s) "
+                "on duplicate key update code=%s, year=%s, "
+                "eps=%s, div1=%s, div2=%s, div3=%s, reg_time=%s, "
+                "div_time=%s",
                 (div[0], div[1], div[2], div[3], div[4], div[5],
-                 div[0], div[1]))
+                 "1977-01-06", "1977-01-06",
+                 div[0], div[1], div[2], div[3], div[4], div[5],
+                 "1977-01-06", "1977-01-06"))
         self.db.commit()
 
     def insert_securities_day_quote(self, quote):
